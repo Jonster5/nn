@@ -1,6 +1,7 @@
 import { Layer } from './layer';
 import { relu, reluPrime, sigmoid, sigmoidPrime } from './math';
 import fs from 'fs';
+import path from 'path';
 
 export class NeuralNetwork {
     layers: Layer[];
@@ -37,17 +38,18 @@ export class NeuralNetwork {
         return new this([1]);
     }
 
-    export(path: string) {
+    export(file: string) {
         const layers = this.layers.map((layer) => {
             return layer.nodes.map((node, i) => {
                 return {
                     value: node.value,
                     connections: node.connections.map((c) => c.value),
+                    output: node.output
                 };
             });
         });
 
-        console.log(layers);
+        fs.writeFileSync(path.resolve(file), JSON.stringify(layers));
     }
 
     predict(input: number[]) {
@@ -74,24 +76,56 @@ export class NeuralNetwork {
     }
 
     train(input: number[], target: number[]) {
-        this.predict(input);
-
-        this.layers[this.layers.length - 1].nodes.forEach((node, i) => {
-            node.error = target[i] - node.output;
+        this.layers[0].nodes.forEach((node, i) => {
+            node.output = input[i];
         });
 
-        // return this.predict(input);
+        this.layers.forEach((layer) => {
+            layer.nodes.forEach((node) => {
+                const sum = node.connections.reduce(
+                    (sum, con) => sum + con.left.output * con.value,
+                    0
+                );
+
+                node.output = this.activation(sum + node.value);
+            });
+        });
+
+        this.layers[this.layers.length - 1].nodes.forEach((node, i) => {
+            node.error = this.activationPrime(node.output) * target[i] - node.output;
+            node.value += node.error * this.learningRate;
+
+            node.connections.forEach(weight => {
+                weight.value += node.error * this.learningRate;
+            })
+        });
+
+        for (let i = this.layers.length - 2; i >= 0; i--) {
+            this.layers[i].nodes.forEach((node, j) => {
+                node.error = this.activationPrime(node.output) * this.layers[i + 1].nodes.reduce((a, b) => a * b.error, 0) * node.value; 
+                node.value += node.error * this.learningRate;
+
+                if (node.connections.length > 0) {
+                    node.connections.forEach(weight => {
+                        weight.value += node.error * this.learningRate;
+                    })
+                }
+            });
+        }
+        
+        this.layers.forEach(l => l.reset());
     }
 }
 
 /* formulas:
     feedforward:
-    layer output = f((i1 * w1 + i2 * w2 + ...) + bias)
+    node output = f((i1 * w1 + i2 * w2 + ...) + bias)
 
     Backpropogation:
-    output error = target - output
-    hidden error = output error * output layer weights * f'(hidden output)
+    output layer error = f'(output) * target - output
 
-    delta = (learning rate * value * error) + (momentum * previous delta)
+    for each layer (in reverse excluding output and input layers):
+    delta error = f'(current output) * (previous layer node error * value)
+    weight/bias change = value + delta error * lrate
 
 */

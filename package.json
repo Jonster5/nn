@@ -6,14 +6,15 @@
 	"scripts": {
 		"build": "rimraf dist && tsc",
 		"predev": "yarn build",
-		"dev": "cross-env NODE_ENV=development concurrently \"tsc --watch\" \"nodemon -q dist/index.js\"",
+		"dev": "cross-env NODE_ENV=development concurrently \"tsc --watch\" \"nodemon -q dist/index.js --ignore output/* \"",
 		"prestart": "yarn build",
 		"start": "cross-env NODE_ENV=production node dist/index.js"
 	},
 	"dependencies": {
 		"@types/node": "^16.11.11",
 		"rimraf": "^3.0.2",
-		"typescript": "^4.5.2"
+		"typescript": "^4.5.2",
+		"cross-env": "^7.0.3"
 	},
 	"devDependencies": {
 		"@types/cors": "^2.8.12",
