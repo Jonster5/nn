@@ -57,16 +57,12 @@ export class NeuralNetwork {
             node.output = input[i];
         });
 
-        this.layers.forEach((layer) => {
-            layer.nodes.forEach((node) => {
-                const sum = node.connections.reduce(
-                    (sum, con) => sum + con.left.output * con.value,
-                    0
-                );
-
+        for (let i = 1; i < this.layers.length; i++) {
+            this.layers[i].nodes.forEach(node => {
+                const sum = node.connections.reduce((s, c) => s + c.left.output * c.value, 0);
                 node.output = this.activation(sum + node.value);
             });
-        });
+        }
 
         const output = this.layers[this.layers.length - 1].nodes.map(
             (n) => n.output
@@ -80,40 +76,53 @@ export class NeuralNetwork {
             node.output = input[i];
         });
 
-        this.layers.forEach((layer) => {
-            layer.nodes.forEach((node) => {
-                const sum = node.connections.reduce(
-                    (sum, con) => sum + con.left.output * con.value,
-                    0
-                );
-
+        for (let i = 1; i < this.layers.length; i++) {
+            this.layers[i].nodes.forEach(node => {
+                const sum = node.connections.reduce((s, c) => s + c.left.output * c.value, 0);
                 node.output = this.activation(sum + node.value);
             });
-        });
-
-        this.layers[this.layers.length - 1].nodes.forEach((node, i) => {
-            node.error = this.activationPrime(node.output) * target[i] - node.output;
-            node.value += node.error * this.learningRate;
-
-            node.connections.forEach(weight => {
-                weight.value += node.error * this.learningRate;
-            })
-        });
-
-        for (let i = this.layers.length - 2; i >= 0; i--) {
-            this.layers[i].nodes.forEach((node, j) => {
-                node.error = this.activationPrime(node.output) * this.layers[i + 1].nodes.reduce((a, b) => a * b.error, 0) * node.value; 
-                node.value += node.error * this.learningRate;
-
-                if (node.connections.length > 0) {
-                    node.connections.forEach(weight => {
-                        weight.value += node.error * this.learningRate;
-                    })
-                }
-            });
         }
-        
-        this.layers.forEach(l => l.reset());
+
+        this.layers[2].nodes.forEach((node, i) => {
+            node.error = target[i] - node.output;
+        });
+
+        this.layers[2].nodes.forEach((node, i) => {
+            node.gradient = node.error * this.activationPrime(node.output) * this.learningRate;
+        });
+
+        this.layers[2].nodes.forEach((node, i) => {
+            node.delta = this.layers[1].nodes.reduce((a, b) => a *= b.output, node.gradient);
+
+        })
+
+        this.layers[2].nodes.forEach((node, i) => {
+            node.connections.forEach(c => {
+                c.value += node.delta;
+            });
+            node.value += node.gradient;
+        });
+
+        this.layers[1].nodes.forEach((node, i) => {
+            node.error = target[i] - node.output;
+        });
+
+        this.layers[1].nodes.forEach((node, i) => {
+            node.gradient = node.error * this.activationPrime(node.output);
+        });
+
+        this.layers[1].nodes.forEach((node, i) => {
+            node.delta = this.layers[0].nodes.reduce((a, b) => a *= b.output, node.gradient);
+
+        })
+
+        this.layers[1].nodes.forEach((node, i) => {
+            node.connections.forEach(c => {
+                c.value += node.delta;
+            });
+            node.value += node.gradient;
+        });
+
     }
 }
 
