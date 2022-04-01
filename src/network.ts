@@ -1,5 +1,4 @@
-import * as math from 'mathjs';
-import { matrix, Matrix } from 'mathjs';
+import { Matrix } from "./matrix";
 
 export class NeuralNetwork {
     inputNodes: Matrix;
@@ -9,7 +8,8 @@ export class NeuralNetwork {
     weightsHO: Matrix;
     biasH: Matrix;
     biasO: Matrix;
-    activation: ((x: number) => number)[];
+    a: (x: number) => number;
+    aPrime: (x: number) => number;
     lRate: number;
 
     constructor(
@@ -17,83 +17,87 @@ export class NeuralNetwork {
         activation: Function,
         learningRate?: number
     ) {
-        this.inputNodes = math.map(math.zeros(model[0]), Math.random) as Matrix;
-        this.hiddenNodes = math.map(
-            math.zeros(model[0]),
-            Math.random
-        ) as Matrix;
-        this.outputNodes = math.map(
-            math.zeros(model[0]),
-            Math.random
-        ) as Matrix;
+        this.inputNodes = new Matrix(model[0], 1).randomize();
+        this.hiddenNodes = new Matrix(model[1], 1).randomize();
+        this.outputNodes = new Matrix(model[2], 1).randomize();
 
-        this.weightsIH = math.map(
-            math.zeros([model[1], model[0]]),
-            Math.random
-        ) as Matrix;
-        this.weightsHO = math.map(
-            math.zeros([model[2], model[1]]),
-            Math.random
-        ) as Matrix;
-        this.biasH = math.map(math.zeros(model[1]), Math.random) as Matrix;
-        this.biasO = math.map(math.zeros(model[2]), Math.random) as Matrix;
+        this.weightsIH = new Matrix(model[1], model[0]).randomize();
+        this.weightsHO = new Matrix(model[2], model[1]).randomize();
 
-        this.activation = activation();
+        this.biasH = new Matrix(model[1], 1).randomize();
+        this.biasO = new Matrix(model[2], 1).randomize();
+
+        this.a = activation()[0];
+        this.aPrime = activation()[1];
         this.lRate = learningRate ?? 0.1;
     }
 
     predict(inputArr: number[]) {
-        let input = matrix(inputArr);
+        let input = Matrix.fromArray(inputArr);
 
-        let hidden = math.multiply(this.weightsIH, input);
-        hidden = math.add(hidden, this.biasH);
-        hidden = math.map(hidden, this.activation[0]);
+        let hidden = this.weightsIH
+            .clone()
+            .multiply(input)
+            .add(this.biasH)
+            .map(this.a);
 
-        let output = math.multiply(this.weightsHO, hidden);
-        output = math.add(output, this.biasO);
-        output = math.map(output, this.activation[0]);
+        let output = this.weightsHO
+            .clone()
+            .multiply(hidden)
+            .add(this.biasO)
+            .map(this.a);
 
         return output.toArray();
     }
 
     train(inputArr: number[], targetArr: number[]) {
-        let input = matrix(inputArr);
-        let target = matrix(targetArr);
+        const input = Matrix.fromArray(inputArr);
+        const target = Matrix.fromArray(targetArr);
 
         // feed forward
-        let hidden = math.multiply(this.weightsIH, input);
-        hidden = math.add(hidden, this.biasH);
-        hidden = math.map(hidden, this.activation[0]);
+        const hidden = this.weightsIH
+            .clone()
+            .multiply(input)
+            .add(this.biasH)
+            .map(this.a);
 
-        let output = math.multiply(this.weightsHO, hidden);
-        output = math.add(output, this.biasO);
-        output = math.map(output, this.activation[0]);
+        const output = this.weightsHO
+            .clone()
+            .multiply(hidden)
+            .add(this.biasO)
+            .map(this.a);
 
         // Calculate the error
-        let outputError = math.subtract(target, output);
+        const outputError = target.clone().subtract(output);
 
         // Calculate gradient
-        let outputGradient = math.map(output, this.activation[1]);
-        outputGradient = math.multiply(outputGradient, outputError);
-        outputGradient = math.multiply(outputGradient, this.lRate);
+        const outputGradient = output
+            .clone()
+            .map(this.aPrime)
+            .multiply(outputError)
+            .multiply(this.lRate);
 
         // Calculate deltas
-        let weightHODelta = math.multiply(outputGradient, math.transpose(hidden));
-        this.weightsHO = math.add(this.weightsHO, weightHODelta);
-        this.biasO = math.add(this.biasO, outputGradient);
+        const weightsHODelta = outputGradient
+            .clone()
+            .multiply(hidden)
+
+        // Apply deltas
+        this.weightsHO.add(weightsHODelta);
+        this.biasO.add(outputGradient);
 
         // Calculate the hidden layer errors
-        let hiddenError = math.multiply(math.transpose(this.weightsHO), outputError);
+        const hiddenError = this.weightsHO.clone().multiply(outputError);
 
         // Calculate hidden gradient
-        let hiddenGradient = math.map(hidden, this.activation[1]);
-        hiddenGradient = math.multiply(hiddenGradient, hiddenError);
-        hiddenGradient = math.multiply(hiddenGradient, this.lRate);
+        const hiddenGradient = hidden.clone().map(this.aPrime).multiply(hiddenError).multiply(this.lRate);
 
-        // Calcuate input->hidden deltas
-        let weightIHDelta = math.multiply(hiddenGradient, math.transpose(input));
-        this.weightsIH = math.add(this.weightsIH, weightIHDelta);
-        this.biasH = math.add(this.biasH, hiddenGradient);
+        // Calcuate deltas
+        const weightsIHDelta = hiddenGradient.clone().multiply(input);
+
+        // Apply deltas
+        this.weightsIH.add(weightsIHDelta);
+        this.biasH.add(hiddenGradient);
     }
 
     // serialize() {

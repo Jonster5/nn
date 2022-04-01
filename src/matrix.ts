@@ -9,6 +9,10 @@ export class Matrix {
         this.data = Array(this.rows).fill(0).map(() => Array(this.cols).fill(0));
     }
 
+    static fromArray(arr: number[]) {
+        return new this(arr.length, 1).map((x, i) => arr[i]);
+    }
+
     static import() {
         // return new this();
     }
@@ -27,6 +31,15 @@ export class Matrix {
         } else {
             if (this.rows !== n.rows || this.cols !== n.cols) throw 'rows and columns do not match';
             return this.map((x, i, j) => x + n.data[i][j]);
+        }
+    }
+
+    subtract(n: Matrix | number) {
+        if (typeof n === 'number') {
+            return this.map(x => x - n);
+        } else {
+            if (this.rows !== n.rows || this.cols !== n.cols) throw 'rows and columns do not match';
+            return this.map((x, i, j) => x - n.data[i][j]);
         }
     }
 
@@ -59,8 +72,6 @@ export class Matrix {
     }
 
     toArray() {
-
+        return [...this.data];
     }
-
-
 }
