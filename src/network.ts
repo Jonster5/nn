@@ -1,140 +1,131 @@
-import { Layer } from './layer';
-import { relu, reluPrime, sigmoid, sigmoidPrime } from './math';
-import fs from 'fs';
-import path from 'path';
+import * as math from 'mathjs';
+import { matrix, Matrix } from 'mathjs';
 
 export class NeuralNetwork {
-    layers: Layer[];
-    learningRate: number;
-    momentum: number;
-
-    activation: (x: number) => number;
-    activationPrime: (x: number) => number;
+    inputNodes: Matrix;
+    hiddenNodes: Matrix;
+    outputNodes: Matrix;
+    weightsIH: Matrix;
+    weightsHO: Matrix;
+    biasH: Matrix;
+    biasO: Matrix;
+    activation: ((x: number) => number)[];
+    lRate: number;
 
     constructor(
-        model: number[],
-        rate?: number,
-        momentum?: number,
-        activation?: (x: number) => number,
-        activationPrime?: (x: number) => number
+        model: [number, number, number],
+        activation: Function,
+        learningRate?: number
     ) {
-        this.layers = [];
+        this.inputNodes = math.map(math.zeros(model[0]), Math.random) as Matrix;
+        this.hiddenNodes = math.map(
+            math.zeros(model[0]),
+            Math.random
+        ) as Matrix;
+        this.outputNodes = math.map(
+            math.zeros(model[0]),
+            Math.random
+        ) as Matrix;
 
-        for (let i = 0; i < model.length; i++) {
-            this.layers[i] = new Layer(model[i]);
-        }
+        this.weightsIH = math.map(
+            math.zeros([model[1], model[0]]),
+            Math.random
+        ) as Matrix;
+        this.weightsHO = math.map(
+            math.zeros([model[2], model[1]]),
+            Math.random
+        ) as Matrix;
+        this.biasH = math.map(math.zeros(model[1]), Math.random) as Matrix;
+        this.biasO = math.map(math.zeros(model[2]), Math.random) as Matrix;
 
-        for (let i = 1; i < this.layers.length; i++) {
-            this.layers[i].connect(this.layers[i - 1]);
-        }
-
-        this.learningRate = rate ?? 0.1;
-        this.momentum = momentum ?? 0.1;
-        this.activation = activation ?? sigmoid;
-        this.activationPrime = activation ?? sigmoidPrime;
+        this.activation = activation();
+        this.lRate = learningRate ?? 0.1;
     }
 
-    static import(path: string) {
-        return new this([1]);
+    predict(inputArr: number[]) {
+        let input = matrix(inputArr);
+
+        let hidden = math.multiply(this.weightsIH, input);
+        hidden = math.add(hidden, this.biasH);
+        hidden = math.map(hidden, this.activation[0]);
+
+        let output = math.multiply(this.weightsHO, hidden);
+        output = math.add(output, this.biasO);
+        output = math.map(output, this.activation[0]);
+
+        return output.toArray();
     }
 
-    export(file: string) {
-        const layers = this.layers.map((layer) => {
-            return layer.nodes.map((node, i) => {
-                return {
-                    value: node.value,
-                    connections: node.connections.map((c) => c.value),
-                    output: node.output
-                };
-            });
-        });
+    train(inputArr: number[], targetArr: number[]) {
+        let input = matrix(inputArr);
+        let target = matrix(targetArr);
 
-        fs.writeFileSync(path.resolve(file), JSON.stringify(layers));
+        let hidden = math.multiply(this.weightsIH, input);
+        hidden = math.add(hidden, this.biasH);
+        hidden = math.map(hidden, this.activation[0]);
+
+        let output = math.multiply(this.weightsHO, hidden);
+        output = math.add(output, this.biasO);
+        output = math.map(output, this.activation[0]);
+
+        //     // Convert array to matrix object
+        //     let targets = .Matrix.fromArray(target);
+        //     // Calculate the error
+        //     // ERROR = TARGETS - OUTPUTS
+        //     let output_errors = .Matrix.subtract(targets, outputs);
+        //     // let gradient = outputs * (1 - outputs);
+        //     // Calculate gradient
+        //     let gradients = .Matrix.map(
+        //         outputs,
+        //         this.activation_function.dfunc
+        //     );
+        //     gradients.multiply(output_errors);
+        //     gradients.multiply(this.learning_rate);
+        //     // Calculate deltas
+        //     let hidden_T = .Matrix.transpose(hidden);
+        //     let weight_ho_deltas = .Matrix.multiply(gradients, hidden_T);
+        //     // Adjust the weights by deltas
+        //     this.weights_ho.add(weight_ho_deltas);
+        //     // Adjust the bias by its deltas (which is just the gradients)
+        //     this.bias_o.add(gradients);
+        //     // Calculate the hidden layer errors
+        //     let who_t = .Matrix.transpose(this.weights_ho);
+        //     let hidden_errors = .Matrix.multiply(who_t, output_errors);
+        //     // Calculate hidden gradient
+        //     let hidden_gradient = .Matrix.map(
+        //         hidden,
+        //         this.activation_function.dfunc
+        //     );
+        //     hidden_gradient.multiply(hidden_errors);
+        //     hidden_gradient.multiply(this.learning_rate);
+        //     // Calcuate input->hidden deltas
+        //     let inputs_T = .Matrix.transpose(inputs);
+        //     let weight_ih_deltas = .Matrix.multiply(
+        //         hidden_gradient,
+        //         inputs_T
+        //     );
+        //     this.weights_ih.add(weight_ih_deltas);
+        //     this.bias_h.add(hidden_gradient);
     }
 
-    predict(input: number[]) {
-        this.layers[0].nodes.forEach((node, i) => {
-            node.output = input[i];
-        });
+    // serialize() {
+    //     return JSON.stringify(this);
+    // }
 
-        for (let i = 1; i < this.layers.length; i++) {
-            this.layers[i].nodes.forEach(node => {
-                const sum = node.connections.reduce((s, c) => s + c.left.output * c.value, 0);
-                node.output = this.activation(sum + node.value);
-            });
-        }
-
-        const output = this.layers[this.layers.length - 1].nodes.map(
-            (n) => n.output
-        );
-
-        return output;
-    }
-
-    train(input: number[], target: number[]) {
-        this.layers[0].nodes.forEach((node, i) => {
-            node.output = input[i];
-        });
-
-        for (let i = 1; i < this.layers.length; i++) {
-            this.layers[i].nodes.forEach(node => {
-                const sum = node.connections.reduce((s, c) => s + c.left.output * c.value, 0);
-                node.output = this.activation(sum + node.value);
-            });
-        }
-
-        this.layers[2].nodes.forEach((node, i) => {
-            node.error = target[i] - node.output;
-        });
-
-        this.layers[2].nodes.forEach((node, i) => {
-            node.gradient = node.error * this.activationPrime(node.output) * this.learningRate;
-        });
-
-        this.layers[2].nodes.forEach((node, i) => {
-            node.delta = this.layers[1].nodes.reduce((a, b) => a *= b.output, node.gradient);
-
-        })
-
-        this.layers[2].nodes.forEach((node, i) => {
-            node.connections.forEach(c => {
-                c.value += node.delta;
-            });
-            node.value += node.gradient;
-        });
-
-        this.layers[1].nodes.forEach((node, i) => {
-            node.error = target[i] - node.output;
-        });
-
-        this.layers[1].nodes.forEach((node, i) => {
-            node.gradient = node.error * this.activationPrime(node.output);
-        });
-
-        this.layers[1].nodes.forEach((node, i) => {
-            node.delta = this.layers[0].nodes.reduce((a, b) => a *= b.output, node.gradient);
-
-        })
-
-        this.layers[1].nodes.forEach((node, i) => {
-            node.connections.forEach(c => {
-                c.value += node.delta;
-            });
-            node.value += node.gradient;
-        });
-
-    }
+    // static deserialize(data) {
+    //     if (typeof data == 'string') {
+    //         data = JSON.parse(data);
+    //     }
+    //     let nn = new NeuralNetwork(
+    //         data.input_nodes,
+    //         data.hidden_nodes,
+    //         data.output_nodes
+    //     );
+    //     nn.weights_ih = Matrix.deserialize(data.weights_ih);
+    //     nn.weights_ho = Matrix.deserialize(data.weights_ho);
+    //     nn.bias_h = Matrix.deserialize(data.bias_h);
+    //     nn.bias_o = Matrix.deserialize(data.bias_o);
+    //     nn.learning_rate = data.learning_rate;
+    //     return nn;
+    // }
 }
-
-/* formulas:
-    feedforward:
-    node output = f((i1 * w1 + i2 * w2 + ...) + bias)
-
-    Backpropogation:
-    output layer error = f'(output) * target - output
-
-    for each layer (in reverse excluding output and input layers):
-    delta error = f'(current output) * (previous layer node error * value)
-    weight/bias change = value + delta error * lrate
-
-*/
