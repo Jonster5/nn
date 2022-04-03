@@ -1,77 +1,159 @@
 export class Matrix {
-    data: number[][];
     rows: number;
     cols: number;
+    data: number[][];
 
     constructor(rows: number, cols: number) {
         this.rows = rows;
         this.cols = cols;
-        this.data = Array(this.rows).fill(0).map(() => Array(this.cols).fill(0));
+        this.data = Array(this.rows)
+            .fill(0)
+            .map(() => Array(this.cols).fill(0));
     }
 
     static fromArray(arr: number[]) {
-        return new this(arr.length, 1).map((x, i) => arr[i]);
+        return new Matrix(arr.length, 1).map((_, i) => arr[i] as number);
     }
 
-    static import() {
-        // return new this();
+    static import(m: string) {
+        const data = JSON.parse(m);
+        const matrix = new Matrix(data.rows, data.cols);
+        matrix.data = data.data;
+        return matrix;
     }
 
-    export() {
-        return JSON.stringify(this);
-    }
-
-    randomize() {
-        return this.map(() => Math.random());
-    }
-
-    add(n: Matrix | number) {
-        if (typeof n === 'number') {
-            return this.map(x => x + n);
-        } else {
-            if (this.rows !== n.rows || this.cols !== n.cols) throw 'rows and columns do not match';
-            return this.map((x, i, j) => x + n.data[i][j]);
+    static multiply(a: Matrix, b: Matrix) {
+        if (a.cols !== b.rows) {
+            console.error(`Multiplication Error: ${a.cols} !== ${b.rows}`);
         }
+        return new Matrix(a.rows, b.cols).map((_, i, j) => {
+            let sum = 0;
+            for (let k = 0; k < a.cols; k++) {
+                sum += a.data[i][k] * b.data[k][j];
+            }
+            return sum;
+        });
     }
 
-    subtract(n: Matrix | number) {
-        if (typeof n === 'number') {
-            return this.map(x => x - n);
-        } else {
-            if (this.rows !== n.rows || this.cols !== n.cols) throw 'rows and columns do not match';
-            return this.map((x, i, j) => x - n.data[i][j]);
+    static subtract(a: Matrix, b: Matrix) {
+        if (a.rows !== b.rows || a.cols !== b.cols) {
+            console.error(
+                `Subtraction Error: ${a.rows} !== ${b.rows} || ${a.cols} !== ${b.cols}`
+            );
         }
+        return a.clone().map((e, i, j) => e - b.data[i][j]);
     }
 
-    multiply(n: Matrix | number) {
-        if (typeof n === 'number') {
-            return this.map(x => x * n);
-        } else {
-            if (this.cols !== n.rows) throw 'Columns of A must match rows of B.';
+    static transpose(m: Matrix) {
+        const n = new Matrix(m.cols, m.rows);
 
-            return this.map((x, i, j) => x * n.data[i][j]);
-        }
-    }
-
-    map(func: (value: number, row: number, col: number) => number) {
-        for (let i = 0; i < this.data.length; i++) {
-            for (let j = 0; j < this.data[i].length; j++) {
-                this.data[i][j] = func(this.data[i][j], i, j);
+        for (let i = 0; i < m.rows; i++) {
+            for (let j = 0; j < m.cols; j++) {
+                n.data[j][i] = m.data[i][j];
             }
         }
+
+        return n;
+    }
+
+    transpose() {
+        const d: number[][] = new Array(this.rows)
+            .fill(0)
+            .map(() => new Array(this.cols).fill(0));
+
+        // Transpose the data
+        for (let i = 0; i < this.rows; i++) {
+            for (let j = 0; j < this.cols; j++) {
+                d[j][i] = this.data[i][j];
+            }
+        }
+
+        // Update dimensions
+        this.data = d;
+        [this.rows, this.cols] = [this.cols, this.rows];
 
         return this;
     }
 
-    transpose() {
-        return new Matrix(this.cols, this.rows).map((_, i, j) => this.data[j][i])
-    }
-
     clone() {
-        return new Matrix(this.rows, this.cols).map((_, i, j) => this.data[i][j])
+        return new Matrix(this.rows, this.cols).map(
+            (_, i, j) => this.data[i][j]
+        );
     }
 
     toArray() {
-        return [...this.data];
+        let arr = [];
+        for (let i = 0; i < this.rows; i++) {
+            for (let j = 0; j < this.cols; j++) {
+                arr.push(this.data[i][j]);
+            }
+        }
+        return arr;
+    }
+
+    randomize() {
+        return this.map((e) => Math.random() * 2 - 1);
+    }
+
+    add(n: Matrix | number) {
+        if (n instanceof Matrix) {
+            if (this.rows !== n.rows || this.cols !== n.cols) {
+                console.error(
+                    `Addition Error: ${this.rows} !== ${n.rows} || ${this.cols} !== ${n.cols}`
+                );
+            }
+            return this.map((e, i, j) => e + n.data[i][j]);
+        } else {
+            return this.map((e) => e + n);
+        }
+    }
+
+    subtract(n: Matrix | number) {
+        if (n instanceof Matrix) {
+            if (this.rows !== n.rows || this.cols !== n.cols) {
+                console.error(
+                    `Subtraction Error: ${this.rows} !== ${n.rows} || ${this.cols} !== ${n.cols}`
+                );
+            }
+            return this.map((e, i, j) => e - n.data[i][j]);
+        } else {
+            return this.map((e) => e - n);
+        }
+    }
+
+    scale(n: number) {
+        return this.map((e) => e * n);
+    }
+
+    hadamard(n: Matrix) {
+        // Hadamard product
+        if (this.rows !== n.rows || this.cols !== n.cols) {
+            console.error(
+                `Hadamard product error: ${this.rows} !== ${n.rows} || ${this.cols} !== ${n.cols}`
+            );
+        }
+        return this.map((e, i, j) => e * n.data[i][j]);
+    }
+
+    map(func: (x: number, i: number, j: number) => number) {
+        for (let i = 0; i < this.rows; i++) {
+            for (let j = 0; j < this.cols; j++) {
+                this.data[i][j] = func(this.data[i][j], i, j);
+            }
+        }
+        return this;
+    }
+
+    static map(a: Matrix, func: (x: number, i: number, j: number) => number) {
+        return a.clone().map(func);
+    }
+
+    print() {
+        console.table(this.data);
+        return this;
+    }
+
+    export() {
+        return JSON.stringify(this);
     }
 }

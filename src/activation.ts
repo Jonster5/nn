@@ -5,3 +5,7 @@ export function sigmoid() {
 export function tanh() {
     return [(x: number) => Math.tanh(x), (y: number) => 1 - y * y];
 }
+
+export function relu() {
+    return [(x: number) => Math.max(0, x), (y: number) => (y > 0 ? 1 : 0)];
+}

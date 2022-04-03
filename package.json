@@ -1,26 +1,24 @@
 {
-	"name": "server-template",
-	"version": "1.0.0",
-	"main": "dist/index.js",
-	"license": "MIT",
-	"scripts": {
-		"build": "rimraf dist && tsc",
-		"predev": "yarn build",
-		"dev": "cross-env NODE_ENV=development concurrently \"tsc --watch\" \"nodemon -q dist/index.js --ignore output/* \"",
-		"prestart": "yarn build",
-		"start": "cross-env NODE_ENV=production node dist/index.js"
-	},
-	"dependencies": {
-		"@types/mathjs": "^9.4.2",
-		"@types/node": "^16.11.11",
-		"cross-env": "^7.0.3",
-		"mathjs": "^10.4.2",
-		"rimraf": "^3.0.2",
-		"typescript": "^4.5.2"
-	},
-	"devDependencies": {
-		"@types/cors": "^2.8.12",
-		"concurrently": "^6.4.0",
-		"nodemon": "^2.0.15"
-	}
+    "name": "server-template",
+    "version": "1.0.0",
+    "main": "dist/index.js",
+    "license": "MIT",
+    "scripts": {
+        "build": "rimraf dist && tsc",
+        "predev": "yarn build",
+        "dev": "cross-env NODE_ENV=development concurrently \"tsc --watch\" \"nodemon -q dist/index.js --ignore output/* dist/* \"",
+        "prestart": "yarn build",
+        "start": "cross-env NODE_ENV=production node dist/index.js"
+    },
+    "dependencies": {
+        "@types/node": "^16.11.11",
+        "cross-env": "^7.0.3",
+        "rimraf": "^3.0.2",
+        "typescript": "^4.5.2"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.12",
+        "concurrently": "^6.4.0",
+        "nodemon": "^2.0.15"
+    }
 }
