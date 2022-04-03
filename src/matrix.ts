@@ -16,9 +16,9 @@ export class Matrix {
     }
 
     static import(m: string) {
-        const data = JSON.parse(m);
-        const matrix = new Matrix(data.rows, data.cols);
-        matrix.data = data.data;
+        const d = JSON.parse(m);
+        const matrix = new Matrix(d.rows, d.cols);
+        matrix.data = d.data;
         return matrix;
     }
 

@@ -4,8 +4,8 @@ export interface NeuralNetModel {}
 
 export interface Layer {
     size: number;
-    act: (x: number) => number;
-    der: (x: number) => number;
+    activation: (x: number, derivative?: boolean) => number;
+    aName: ActivationFunctionName;
 
     weights: Matrix;
     bias: Matrix;
@@ -15,3 +15,10 @@ export interface Layer {
     error: Matrix;
     gradient: Matrix;
 }
+
+export type ActivationFunctionName =
+    | 'sigmoid'
+    | 'tanh'
+    | 'relu'
+    | 'leakyRelu'
+    | 'binaryStep';
