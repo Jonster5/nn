@@ -34,7 +34,11 @@ export class Trainer {
 
             if (verbose) {
                 console.log('Cycle:', cycles);
-                console.log('Mean Error:', error);
+                console.log(
+                    'Error:',
+                    parseFloat((error * 100).toFixed(10)),
+                    '%'
+                );
 
                 if (save) console.log('saved to:', save);
                 console.log();
@@ -45,12 +49,21 @@ export class Trainer {
         }
     }
 
-    demonstrate() {
-        for (let i = 0; i < this.dataset.length; i++) {
-            const { input, target } = this.dataset[i];
+    demonstrate(num: number) {
+        console.log();
+        if (num > this.dataset.length) num = this.dataset.length;
+        for (let i = 0; i < num; i++) {
+            const r = Math.floor(Math.random() * this.dataset.length);
+            const { input, target } = this.dataset[r];
 
-            console.log(`[ ${input} ] => [ ${this.net.predict(input)} ]`);
+            console.log(
+                `[ ${input.join(', ')} ] -> [ ${this.net
+                    .predict(input)
+                    .map((x) => x.toFixed(4))
+                    .join(', ')} ] | [ ${target.join(', ')} ]`
+            );
         }
+        console.log();
     }
 
     private train() {
@@ -59,13 +72,7 @@ export class Trainer {
             const r = Math.floor(Math.random() * this.dataset.length);
             const { input, target } = this.dataset[r];
 
-            this.net.train(input, target);
-        }
-
-        for (let i = 0; i < this.dataset.length; i++) {
-            const { input, target } = this.dataset[i];
-
-            error += this.net.checkError(input, target);
+            error += this.net.train(input, target);
         }
 
         return error / this.cycle;

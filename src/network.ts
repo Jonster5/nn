@@ -1,57 +1,42 @@
 import { Matrix } from './matrix';
 import fs from 'fs';
-import { ActivationFunctionName, Layer } from './networkTypes';
+import { ActivationFunctionName } from './networkTypes';
+import { Layer } from './layer';
 
 export class NeuralNetwork {
     layers: Layer[];
 
     lRate: number;
+    momentum: number;
 
     constructor(
         model: {
             size: number;
             activation?: ActivationFunctionName;
         }[],
-        learningRate?: number
+        learningRate?: number,
+        momentum?: number
     ) {
         this.layers = [];
 
         model.forEach((layer, i) => {
             if (i === 0) {
-                this.layers.push({
-                    size: layer.size,
-                    activation: NeuralNetwork[layer.activation ?? 'sigmoid'],
-                    aName: layer.activation ?? 'sigmoid',
-
-                    weights: new Matrix(layer.size, 1),
-                    bias: new Matrix(layer.size, 1),
-
-                    output: new Matrix(layer.size, 1),
-
-                    error: new Matrix(layer.size, 1),
-                    gradient: new Matrix(layer.size, 1),
-                });
+                this.layers.push(
+                    new Layer(layer.size, 1, layer.activation ?? 'sigmoid')
+                );
             } else {
-                this.layers.push({
-                    size: layer.size,
-                    activation: NeuralNetwork[layer.activation ?? 'sigmoid'],
-                    aName: layer.activation ?? 'sigmoid',
-
-                    weights: new Matrix(
+                this.layers.push(
+                    new Layer(
                         layer.size,
-                        this.layers[i - 1].size
-                    ).randomize(),
-                    bias: new Matrix(layer.size, 1).randomize(),
-
-                    output: new Matrix(layer.size, 1),
-
-                    error: new Matrix(layer.size, 1),
-                    gradient: new Matrix(layer.size, 1),
-                });
+                        model[i - 1].size,
+                        layer.activation ?? 'sigmoid'
+                    )
+                );
             }
         });
 
         this.lRate = learningRate ?? 0.1;
+        this.momentum = momentum ?? 0.1;
     }
 
     predict(inputArr: number[]) {
@@ -98,17 +83,42 @@ export class NeuralNetwork {
             .scale(this.lRate);
 
         // calculate and apply the delta output layer weights
-        this.layers[this.layers.length - 1].weights.add(
-            Matrix.multiply(
-                this.layers[this.layers.length - 1].gradient,
-                Matrix.transpose(this.layers[this.layers.length - 2].output)
+        this.layers[this.layers.length - 1].weights
+            .add(
+                Matrix.multiply(
+                    this.layers[this.layers.length - 1].gradient,
+                    Matrix.transpose(this.layers[this.layers.length - 2].output)
+                )
             )
-        );
+            .add(
+                Matrix.multiply(
+                    this.layers[this.layers.length - 1].pGradient,
+                    Matrix.transpose(this.layers[this.layers.length - 2].output)
+                ).scale(this.momentum)
+            );
 
         // calculate and apply the delta output layer bias
-        this.layers[this.layers.length - 1].bias.add(
-            this.layers[this.layers.length - 1].gradient
-        );
+        this.layers[this.layers.length - 1].bias
+            .add(this.layers[this.layers.length - 1].gradient)
+            .add(
+                this.layers[this.layers.length - 1].pGradient.scale(
+                    this.momentum
+                )
+            );
+
+        // update the output layer's previous gradient
+        this.layers[this.layers.length - 1].pGradient =
+            this.layers[this.layers.length - 1].gradient.clone();
+
+        // return if there are no hidden layers
+        if (this.layers.length < 3) {
+            return Math.abs(
+                this.layers[this.layers.length - 1].error
+                    .toArray()
+                    .reduce((a, b) => a + b, 0) /
+                    this.layers[this.layers.length - 1].error.toArray().length
+            );
+        }
 
         // calculate the error of hidden layers
         for (let i = this.layers.length - 2; i > 0; i--) {
@@ -126,26 +136,36 @@ export class NeuralNetwork {
                 .scale(this.lRate);
 
             // calculate and apply the delta hidden layer weights
-            this.layers[i].weights.add(
-                Matrix.multiply(
-                    this.layers[i].gradient,
-                    Matrix.transpose(this.layers[i - 1].output)
+            this.layers[i].weights
+                .add(
+                    Matrix.multiply(
+                        this.layers[i].gradient,
+                        Matrix.transpose(this.layers[i - 1].output)
+                    )
                 )
-            );
+                .add(
+                    Matrix.multiply(
+                        this.layers[i].pGradient,
+                        Matrix.transpose(this.layers[i - 1].output)
+                    ).scale(this.momentum)
+                );
 
             // calculate and apply the delta hidden layer bias
-            this.layers[i].bias.add(this.layers[i].gradient);
+            this.layers[i].bias
+                .add(this.layers[i].gradient)
+                .add(this.layers[i].pGradient.scale(this.momentum));
+
+            // update the previous gradient
+            this.layers[i].pGradient = this.layers[i].gradient.clone();
         }
-    }
 
-    checkError(inputArr: number[], targetArr: number[]) {
-        const output = this.predict(inputArr);
-
-        const error = targetArr
-            .map((x, i) => Math.abs(x - output[i]))
-            .reduce((a, b) => a + b);
-
-        return error;
+        // return mean error of output layer
+        return Math.abs(
+            this.layers[this.layers.length - 1].error
+                .toArray()
+                .reduce((a, b) => a + b, 0) /
+                this.layers[this.layers.length - 1].error.toArray().length
+        );
     }
 
     export(path: string) {
@@ -157,6 +177,7 @@ export class NeuralNetwork {
                 bias: layer.bias.export(),
             })),
             learningRate: this.lRate,
+            momentum: this.momentum,
         };
 
         fs.writeFileSync(path, JSON.stringify(model));
@@ -165,7 +186,11 @@ export class NeuralNetwork {
     static import(path: string) {
         const model = JSON.parse(fs.readFileSync(path, 'utf8'));
 
-        const nn = new NeuralNetwork(model.layers, model.learningRate);
+        const nn = new NeuralNetwork(
+            model.layers,
+            model.learningRate,
+            model.momentum
+        );
 
         nn.layers.forEach((layer, i) => {
             layer.weights = Matrix.import(model.layers[i].weights);
@@ -173,45 +198,5 @@ export class NeuralNetwork {
         });
 
         return nn;
-    }
-
-    static sigmoid(x: number, derivative?: boolean) {
-        if (derivative) {
-            return x * (1 - x);
-        } else {
-            return 1 / (1 + Math.exp(-x));
-        }
-    }
-
-    static tanh(x: number, derivative?: boolean) {
-        if (derivative) {
-            return 1 - x * x;
-        } else {
-            return Math.tanh(x);
-        }
-    }
-
-    static relu(x: number, derivative?: boolean) {
-        if (derivative) {
-            return x > 0 ? 1 : 0;
-        } else {
-            return x > 0 ? x : 0;
-        }
-    }
-
-    static leakyRelu(x: number, derivative?: boolean) {
-        if (derivative) {
-            return x > 0 ? 1 : 0.01;
-        } else {
-            return x > 0 ? x : 0.01 * x;
-        }
-    }
-
-    static binaryStep(x: number, derivative?: boolean) {
-        if (derivative) {
-            return x > 0 ? 1 : 0;
-        } else {
-            return x > 0 ? 1 : 0;
-        }
     }
 }
